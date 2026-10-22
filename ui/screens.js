@@ -64,9 +64,11 @@ function layoutOf(screens, box) {
 // The live screen the popup is pinned to, or null when the stored name
 // matches no live output — an unplugged monitor, or the unset `auto` setting.
 // The membership check is what stops a stale name from being handed to
-// `PanelWindow.screen` after the monitor it named has gone.
+// `PanelWindow.screen` after the monitor it named has gone. `screens` may be
+// a plain Array (tests) or the QQmlListProperty `Quickshell.screens` hands
+// over, which is list-like but not an Array.
 function screenNamed(screens, name) {
-  if (!Array.isArray(screens)) return null
+  if (!screens || typeof screens.length !== "number") return null
   if (typeof name !== "string" || name === "") return null
   for (var i = 0; i < screens.length; i++) {
     var screen = screens[i]

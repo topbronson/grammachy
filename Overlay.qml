@@ -144,6 +144,10 @@ Item {
   // component completion): the `auto` popup screen means "wherever the panel
   // was", and undoing a pin is handing that one back.
   property var panelInitialScreen: null
+  // The screen the next summon wants the panel on, remembered so the panel
+  // can re-assert it at map time: Quickshell picks the output itself when a
+  // fresh surface maps, overriding any assignment made while it was hidden.
+  property var popupScreenTarget: null
   readonly property int gap: Style.gapsOut + Style.spacing.sm
 
   // Storage is this plugin's inline entry in shell.json, spec section 7. There
@@ -260,6 +264,7 @@ Item {
         && Screens.screenNamed(Quickshell.screens, String(root.panelInitialScreen.name || ""))) {
       chosen = root.panelInitialScreen
     }
+    root.popupScreenTarget = chosen
     if (chosen && panel.screen !== chosen) panel.screen = chosen
   }
 
@@ -1745,6 +1750,19 @@ Item {
     // overlay would take the keyboard focus that the Ctrl + C fallback needs
     // to land on the source window.
     visible: root.opened && root.phase !== "capturing"
+    // Quickshell re-picks the output when the surface actually maps, which
+    // lands after this signal fires — so the target is re-asserted once the
+    // map settles instead of only here.
+    onVisibleChanged: if (visible) screenPinTimer.restart()
+    Timer {
+      id: screenPinTimer
+
+      interval: 120
+      repeat: false
+      onTriggered: if (panel.visible && root.popupScreenTarget
+          && panel.screen !== root.popupScreenTarget) panel.screen = root.popupScreenTarget
+    }
+
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     WlrLayershell.namespace: "grammachy"

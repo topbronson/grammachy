@@ -49,3 +49,13 @@ test("the pin reads back only a live screen", () => {
   assert.equal(screenNamed(screens, undefined), null)
   assert.equal(screenNamed(undefined, "DP-6"), null)
 })
+
+test("the pin works on a QML list, which is not an Array", () => {
+  // `Quickshell.screens` reaches QML JS as a list-like object, not an
+  // Array: `Array.isArray` says false for it. The lookup must not reject it.
+  const listLike = { length: 2, 0: LEFT, 1: WIDE }
+  assert.equal(screenNamed(listLike, "DP-6"), WIDE)
+  assert.equal(screenNamed(listLike, "DP-9"), null)
+  assert.equal(screenNamed({ length: 0 }, "DP-6"), null)
+  assert.equal(screenNamed("DP-6", "DP-6"), null, "a bare string is not a list")
+})
