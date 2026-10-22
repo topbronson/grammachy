@@ -104,7 +104,7 @@ Read them with `journalctl --user -f` or from the terminal that started the shel
 
 ## 5. Smoke item 1: a terminal primary selection
 
-Run this item with **two windows side by side**, because one window cannot tell a card that opens beside the selection from a card that always opens in the same corner.
+Run this item with **two windows side by side**: the card opens centred on the pinned monitor whichever window holds the Selection, so the second window is what tells a card that tracks the source window from one that does not.
 
 1. Open two terminals on an empty workspace so they tile into a left half and a right half.
    The right one only has to sit under the top-right corner of the screen; nothing is done in it.
@@ -113,8 +113,8 @@ Run this item with **two windows side by side**, because one window cannot tell 
    The highlight alone is the primary selection; no copy is needed.
 4. Click the `G` button on the bar.
 
-Expected: the popup opens beside the **left** terminal, at its top edge, on its trailing side, and not in the top-right corner of the screen.
-It never runs off the screen: its trailing edge stays inside the monitor and its top edge stays under the bar.
+Expected: the popup opens centred on the monitor pinned by the Settings `Popup screen` picker, with `Auto` keeping whichever screen the panel was on.
+It sits beside neither terminal and in no bar corner, stays centred in both directions, and runs off neither edge.
 The whole sentence shows, `has` and `book` carry a solid underline, and the hero reads `2 issues, 0 accepted, harper, <n> ms`.
 Accept moves the mark to green and shows the Fix in place.
 Skip dims the mark and drops its underline.
@@ -143,14 +143,10 @@ Every repeat below that expects a Check needs different text, or a different win
 The same text from the same window is stale (spec section 3), and the popup then shows the nothing-new state.
 So change one word in the sentence before you highlight it again.
 
+- **The Popup screen picker.** Open the gear and click a different monitor in the `Popup screen` miniature, then run the item again from a window on the first monitor.
+  The card opens centred on the clicked monitor. Click `Auto` and the next open returns to the screen the panel first showed on.
 - **Every bar position.** Move the bar with `omarchy bar position bottom`, then `left`, `right`, and back to `top`, running the item once at each.
-  The card follows the source window every time and never lands under the bar or off an edge.
-- **A window against the trailing edge.** Select in the **right** terminal instead and click `G`.
-  The card opens on that window's leading side, because the trailing side has no room.
-- **A maximized window.** Make the source terminal fullscreen with SUPER + F and run the item again.
-  The card sits inside the window, held to its trailing edge.
-- **No source window.** Clear the selection, click the desktop background so no window is focused, and click `G`.
-  The nothing-new state opens in the bar widget's own corner, which is the fallback.
+  The card stays centred whatever the bar does.
 - **The same selection twice.** Run the item once and press Esc, then press SUPER + SHIFT + Q again without highlighting anything new.
   The popup opens on the nothing-new state and runs no Check (spec section 3).
   Press `Check last text again` and the same text is checked with no new capture.
@@ -706,7 +702,7 @@ The same three plugin checks CI runs, against the shell installed on this machin
 ```bash
 for file in $(find . -name '*.qml' | sort); do qmllint -I /usr/share/omarchy/shell "$file" || echo "FAILED $file"; done
 omarchy-plugin-validate .
-node --test ui/splice.test.js ui/tokens.test.js ui/settings.test.js ui/keymap.test.js ui/errors.test.js ui/format.test.js ui/anchor.test.js ui/limits.test.js ui/capture.test.js ui/engines.test.js ui/setupCard.test.js ui/deps.test.js
+node --test ui/splice.test.js ui/tokens.test.js ui/settings.test.js ui/keymap.test.js ui/errors.test.js ui/format.test.js ui/anchor.test.js ui/limits.test.js ui/capture.test.js ui/engines.test.js ui/setupCard.test.js ui/deps.test.js ui/screens.test.js
 ```
 
 The `qmllint` on `PATH` reports a syntax error through its exit status alone and prints nothing.

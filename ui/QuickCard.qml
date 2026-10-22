@@ -52,6 +52,8 @@ BorderSurface {
   property string engineSetting: "languagetool"
   property string quickHotkey: "SUPER + SHIFT + Q"
   property string composeHotkey: "SUPER + ALT + Q"
+  property string popupScreen: ""
+  property var screens: []
 
   property var engines: []
   property string engineBusy: ""
@@ -203,6 +205,8 @@ BorderSurface {
       autoReplace: root.autoReplace
       quickHotkey: root.quickHotkey
       composeHotkey: root.composeHotkey
+      popupScreen: root.popupScreen
+      screens: root.screens
       engines: root.engines
       engineBusy: root.engineBusy
       engineBusyBytes: root.engineBusyBytes

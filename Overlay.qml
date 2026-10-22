@@ -15,6 +15,7 @@ import "ui/limits.js" as Limits
 import "ui/engines.js" as EnginesJs
 import "ui/setupCard.js" as Setup
 import "ui/deps.js" as Deps
+import "ui/screens.js" as Screens
 
 Item {
   id: root
@@ -137,6 +138,11 @@ Item {
   readonly property var barConfig: root.shell && root.shell.bar ? root.shell.bar : null
   readonly property string barPosition: root.barConfig ? String(root.barConfig.position) : "top"
   readonly property int barSize: root.barConfig ? root.barConfig.barSize : Style.bar.sizeHorizontal
+
+  // The screen the panel first showed on, captured before `applyPopupScreen`
+  // ever moves it: the `auto` popup screen means "wherever the panel was",
+  // and undoing a pin is handing that one back.
+  property var panelInitialScreen: null
   readonly property int gap: Style.gapsOut + Style.spacing.sm
 
   // Storage is this plugin's inline entry in shell.json, spec section 7. There
@@ -211,6 +217,21 @@ Item {
     return command
   }
 
+  // The popup belongs on the monitor picked in Settings, whatever output the
+  // compositor has focused. Layer-shell re-association is only reliable on an
+  // unmapped surface, so this runs from open() while the panel is still
+  // hidden behind the capturing phase. A name no live output answers to — an
+  // unplugged monitor — falls back to the screen the panel first showed on.
+  function applyPopupScreen() {
+    var pinned = Screens.screenNamed(Quickshell.screens, root.setting("popupScreen"))
+    var chosen = pinned
+    if (!chosen && root.panelInitialScreen
+        && Screens.screenNamed(Quickshell.screens, String(root.panelInitialScreen.name || ""))) {
+      chosen = root.panelInitialScreen
+    }
+    if (chosen && panel.screen !== chosen) panel.screen = chosen
+  }
+
   function open(payloadJson) {
     var payload = ({})
     try {
@@ -220,6 +241,7 @@ Item {
     }
 
     root.opened = true
+    root.applyPopupScreen()
     if (String(payload.mode || "quick") === "compose") {
       if (typeof payload.text === "string") root.composeWith(payload.text)
       else root.showCompose()
@@ -1688,6 +1710,10 @@ Item {
   PanelWindow {
     id: panel
 
+    // The `auto` popup screen is whichever one this panel first showed on,
+    // captured before `applyPopupScreen` ever moves the panel.
+    Component.onCompleted: root.panelInitialScreen = panel.screen
+
     // Nothing shows while the Selection is still being captured: a visible
     // overlay would take the keyboard focus that the Ctrl + C fallback needs
     // to land on the source window.
@@ -1736,28 +1762,11 @@ Item {
 
         visible: root.surface === "quick"
 
-        // The card opens beside the window the Selection came from, so it is
-        // near the text it is about rather than in a corner of the screen.
-        // `ui/anchor.js` owns that arithmetic, including the bar corner it
-        // falls back to when no window on this monitor held the Selection.
-        //
-        // Hyprland reports a window in the global layout and this surface
-        // covers one monitor of it, so the surface's own origin is what turns
-        // the one into the other.
-        readonly property var placement: Anchor.placeCard({
-          window: root.sourceWindow,
-          origin: {
-            x: panel.screen ? panel.screen.x : 0,
-            y: panel.screen ? panel.screen.y : 0
-          },
-          bounds: { width: parent.width, height: parent.height },
-          card: { width: card.width, height: card.height },
-          bar: { position: root.barPosition, size: root.barSize },
-          gap: root.gap
-        })
-
-        x: card.placement.x
-        y: card.placement.y
+        // The card opens centred on the monitor the popup is pinned to in
+        // Settings — `applyPopupScreen` moves the panel there while it is
+        // still hidden. The window the Selection came from still answers who
+        // gets the Replace keystroke; it no longer says where the card goes.
+        anchors.centerIn: parent
 
         cardWidth: Math.min(Style.space(680), parent.width - root.gap * 2)
         maxCardHeight: parent.height - root.barSize - root.gap * 2
@@ -1790,6 +1799,8 @@ Item {
         engineSetting: root.setting("engine")
         quickHotkey: root.setting("quickHotkey")
         composeHotkey: root.setting("composeHotkey")
+        popupScreen: root.setting("popupScreen")
+        screens: Quickshell.screens
 
         engines: root.engines
         engineBusy: root.engineBusy
@@ -1864,6 +1875,8 @@ Item {
         engineSetting: root.setting("engine")
         quickHotkey: root.setting("quickHotkey")
         composeHotkey: root.setting("composeHotkey")
+        popupScreen: root.setting("popupScreen")
+        screens: Quickshell.screens
         autoReplace: root.autoReplace
 
         engines: root.engines

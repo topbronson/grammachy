@@ -10,7 +10,11 @@ var DESCRIPTORS = {
   engine: { type: "enum", values: ["languagetool", "harper"], fallback: "harper" },
   autoReplace: { type: "boolean", fallback: false },
   quickHotkey: { type: "text", fallback: "SUPER + SHIFT + Q" },
-  composeHotkey: { type: "text", fallback: "SUPER + ALT + Q" }
+  composeHotkey: { type: "text", fallback: "SUPER + ALT + Q" },
+  // The monitor the quick popup opens centred on, chosen in Settings. The
+  // `text` type rejects the blank, so the `Auto` write stores "" and reads
+  // back the "" fallback — an unset pin and a cleared one are one state.
+  popupScreen: { type: "text", fallback: "" }
 }
 
 var NATIVE_LANGUAGE_OPTIONS = [

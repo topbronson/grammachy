@@ -4,6 +4,7 @@ import qs.Commons
 import qs.Ui
 import "engines.js" as EnginesJs
 import "settings.js" as Settings
+import "screens.js" as Screens
 
 ColumnLayout {
   id: root
@@ -14,6 +15,8 @@ ColumnLayout {
   property bool autoReplace: false
   property string quickHotkey: "SUPER + SHIFT + Q"
   property string composeHotkey: "SUPER + ALT + Q"
+  property string popupScreen: ""
+  property var screens: []
 
   property var engines: []
   property string engineBusy: ""
@@ -171,6 +174,103 @@ ColumnLayout {
     checked: root.autoReplace
     foreground: Color.popups.text
     onClicked: root.settingChanged("autoReplace", !root.autoReplace)
+  }
+
+  // The quick popup opens centred on the monitor picked here. The rows are
+  // `ui/screens.js`'s miniature of the global layout and this view only
+  // paints them, so a click says which output `Overlay.applyPopupScreen`
+  // should move the panel to. Picks apply the next time the popup opens:
+  // the panel is only ever moved while it is hidden.
+  ColumnLayout {
+    Layout.fillWidth: true
+    spacing: Style.spacing.labelGap
+
+    Text {
+      text: "Popup screen"
+      color: Qt.darker(Color.popups.text, 1.4)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      font.bold: true
+    }
+
+    Text {
+      Layout.fillWidth: true
+      text: "The quick popup opens centred on the monitor you click. Auto keeps whichever screen the panel was on. Picks apply the next time the popup opens."
+      color: Color.muted
+      wrapMode: Text.Wrap
+      font.family: Style.font.family
+      font.pixelSize: Style.font.bodySmall
+    }
+
+    Item {
+      id: pickerBox
+
+      Layout.fillWidth: true
+      Layout.preferredHeight: Style.space(96)
+
+      property real boxWidth: width
+      property real boxHeight: height
+      readonly property var rows: Screens.layoutOf(root.screens, { width: boxWidth, height: boxHeight })
+
+      Repeater {
+        model: pickerBox.rows
+
+        delegate: Rectangle {
+          required property var modelData
+
+          x: modelData.x
+          y: modelData.y
+          width: modelData.width
+          height: modelData.height
+          radius: 2
+          color: modelData.name === root.popupScreen ? Qt.alpha(Color.accent, 0.35) : Qt.alpha(Color.popups.text, 0.08)
+          border.color: modelData.name === root.popupScreen ? Color.accent : Color.popups.border
+          border.width: modelData.name === root.popupScreen ? 2 : 1
+
+          Text {
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width - 4)
+            text: modelData.name
+            textFormat: Text.PlainText
+            color: Color.popups.text
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideMiddle
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.settingChanged("popupScreen", modelData.name)
+          }
+        }
+      }
+    }
+
+    Rectangle {
+      Layout.preferredWidth: autoLabel.implicitWidth + Style.space(16)
+      Layout.preferredHeight: autoLabel.implicitHeight + Style.space(8)
+      radius: 4
+      color: root.popupScreen === "" ? Qt.alpha(Color.accent, 0.35) : Qt.alpha(Color.popups.text, 0.08)
+      border.color: root.popupScreen === "" ? Color.accent : Color.popups.border
+      border.width: root.popupScreen === "" ? 2 : 1
+
+      Text {
+        id: autoLabel
+
+        anchors.centerIn: parent
+        text: "Auto"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.settingChanged("popupScreen", "")
+      }
+    }
   }
 
   EnginesView {

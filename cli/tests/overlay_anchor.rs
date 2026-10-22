@@ -63,20 +63,25 @@ fn the_capture_reads_the_source_window_before_it_takes_the_selection() {
 }
 
 #[test]
-fn the_quick_card_is_placed_from_the_source_window() {
+fn the_quick_card_opens_centred_on_the_pinned_monitor() {
     let source = read("Overlay.qml");
 
+    let quick = source
+        .find("QuickCard {")
+        .expect("the overlay hosts the quick card");
+    let body = &source[quick..quick + source[quick..].find("onCloseRequested").unwrap()];
+
     assert!(
-        source.contains("Anchor.placeCard({"),
-        "the quick card takes its place from `ui/anchor.js`"
+        body.contains("anchors.centerIn: parent"),
+        "the quick card is centred on the screen it is shown on"
     );
     assert!(
-        source.contains("window: root.sourceWindow"),
-        "the placement is about the window the Selection came from"
+        !source.contains("Anchor.placeCard({"),
+        "the card no longer takes its place from `ui/anchor.js`"
     );
     assert!(
-        source.contains("x: card.placement.x") && source.contains("y: card.placement.y"),
-        "the card reads both coordinates from that one answer"
+        !source.contains("x: card.placement.x"),
+        "the source window still answers Replace, not placement"
     );
     for corner in [
         "parent.width - card.width - root.gap",
@@ -84,16 +89,21 @@ fn the_quick_card_is_placed_from_the_source_window() {
     ] {
         assert!(
             !source.contains(corner),
-            "the bar corner belongs to `ui/anchor.js` now, not to the card: {corner}"
+            "no corner arithmetic lives on the card: {corner}"
         );
     }
 
-    // Hyprland reports a window in the global layout and this surface covers
-    // one monitor of it, so the placement needs the surface's own origin.
+    // The monitor picked in Settings is applied while the panel is hidden,
+    // and a name no live output answers to falls back rather than pinning to
+    // an unplugged monitor.
+    let pin = function_body(&source, "applyPopupScreen");
     assert!(
-        source.contains("panel.screen ? panel.screen.x : 0")
-            && source.contains("panel.screen ? panel.screen.y : 0"),
-        "the placement converts the global layout to this surface"
+        pin.contains("Screens.screenNamed(") && pin.contains("panel.screen ="),
+        "the pin resolves against the live screens and moves the panel: {pin}"
+    );
+    assert!(
+        function_body(&source, "open").contains("root.applyPopupScreen()"),
+        "every summon pins the panel before anything turns it visible"
     );
 }
 
