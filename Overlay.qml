@@ -139,19 +139,46 @@ Item {
   readonly property string barPosition: root.barConfig ? String(root.barConfig.position) : "top"
   readonly property int barSize: root.barConfig ? root.barConfig.barSize : Style.bar.sizeHorizontal
 
-  // The screen the panel first showed on, captured before `applyPopupScreen`
-  // ever moves it: the `auto` popup screen means "wherever the panel was",
-  // and undoing a pin is handing that one back.
+  // The screen the panel first showed on, captured the first time a summon
+  // finds one (Quickshell hands a PanelWindow its screen on first map, not at
+  // component completion): the `auto` popup screen means "wherever the panel
+  // was", and undoing a pin is handing that one back.
   property var panelInitialScreen: null
   readonly property int gap: Style.gapsOut + Style.spacing.sm
 
   // Storage is this plugin's inline entry in shell.json, spec section 7. There
-  // is no own config file. `shell.shellConfig` is reassigned on every write the
-  // shell makes, so `entry` is a live binding: a change from the Settings view,
-  // from `omarchy-shell shell setBarWidget`, or from a hand edit of the file
-  // all reach the view the same way.
+  // is no own config file. `shell.shellConfig` is the preferred source when it
+  // exists: the shell reassigns it on every write it makes. A third-party
+  // plugin is handed the scoped shell API, which does not carry that property,
+  // so the entry is also read off the file itself through a watcher — a change
+  // from the Settings view, from `omarchy-shell shell setBarWidget`, or from a
+  // hand edit of the file all reach the view through whichever source is live.
   //
-  readonly property var entry: Settings.entryOf(root.shell ? root.shell.shellConfig : null, root.pluginId)
+  readonly property string shellConfigPath: (Quickshell.env("XDG_CONFIG_HOME")
+    || Quickshell.env("HOME") + "/.config") + "/omarchy/shell.json"
+  property var diskConfig: null
+  readonly property var configSource: (root.shell && root.shell.shellConfig)
+    ? root.shell.shellConfig : root.diskConfig
+  readonly property var entry: Settings.entryOf(root.configSource, root.pluginId)
+
+  function readShellConfig() {
+    try {
+      root.diskConfig = JSON.parse(shellConfigFile.text())
+    } catch (error) {
+      console.warn("grammachy: shell.json did not parse:", root.shellConfigPath, error)
+    }
+  }
+
+  FileView {
+    id: shellConfigFile
+
+    path: root.shellConfigPath
+    watchChanges: true
+    preload: true
+    onLoaded: root.readShellConfig()
+    onFileChanged: shellConfigFile.reload()
+    onLoadFailed: console.warn("grammachy: shell.json could not be read:", root.shellConfigPath)
+  }
 
   function setting(name, fallback) {
     return Settings.valueOf(root.entry, name, fallback)
@@ -223,6 +250,10 @@ Item {
   // hidden behind the capturing phase. A name no live output answers to — an
   // unplugged monitor — falls back to the screen the panel first showed on.
   function applyPopupScreen() {
+    // The panel has no screen to remember at component completion — Quickshell
+    // gives it one on first map — so the initial screen is captured here,
+    // before anything has been pinned.
+    if (!root.panelInitialScreen) root.panelInitialScreen = panel.screen
     var pinned = Screens.screenNamed(Quickshell.screens, root.setting("popupScreen"))
     var chosen = pinned
     if (!chosen && root.panelInitialScreen
@@ -1709,10 +1740,6 @@ Item {
 
   PanelWindow {
     id: panel
-
-    // The `auto` popup screen is whichever one this panel first showed on,
-    // captured before `applyPopupScreen` ever moves the panel.
-    Component.onCompleted: root.panelInitialScreen = panel.screen
 
     // Nothing shows while the Selection is still being captured: a visible
     // overlay would take the keyboard focus that the Ctrl + C fallback needs
