@@ -1281,7 +1281,11 @@ Item {
     } catch (error) {
       answer = null
     }
-    if (code === 0 && answer && answer.written === true && answer.verified === true) {
+    // The payload is the proof: the helper prints written/verified only
+    // after reading the new text back from the widget, and prints nothing
+    // else on stdout. quickshell's Process exit code is unreliable here,
+    // so the readback — not the exit status — decides.
+    if (answer && answer.written === true && answer.verified === true) {
       root.applied = true
       root.wholeTarget = null
       root.close()
@@ -1531,6 +1535,7 @@ Item {
     property string identity: ""
     property string answer: ""
     property bool exited: false
+    property int lastExitCode: -1
     property bool stdoutDone: false
     property bool stderrDone: false
     property bool reported: false
@@ -1538,6 +1543,7 @@ Item {
       atspiWrite.startedGeneration = atspiWrite.generation
       atspiWrite.answer = ""
       atspiWrite.exited = false
+      atspiWrite.lastExitCode = -1
       atspiWrite.stdoutDone = false
       atspiWrite.stderrDone = false
       atspiWrite.reported = false
@@ -1551,7 +1557,7 @@ Item {
       if (atspiWrite.reported) return
       if (!atspiWrite.exited || !atspiWrite.stdoutDone || !atspiWrite.stderrDone) return
       atspiWrite.reported = true
-      root.onAtspiWritten(atspiWrite.answer, atspiWrite.exitCode, atspiWrite.startedGeneration)
+      root.onAtspiWritten(atspiWrite.answer, atspiWrite.lastExitCode, atspiWrite.startedGeneration)
     }
 
     command: ["/usr/bin/timeout", "6", "/usr/bin/python3",
