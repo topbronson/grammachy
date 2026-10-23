@@ -14,6 +14,7 @@ const {
   readActiveWindow,
   windowAddress,
   activeWindowPid,
+  terminalClass,
   activeWindowCommand,
   focusCommand,
   isFocused,
@@ -340,4 +341,16 @@ test("no source window at capture leaves the paste as it was", () => {
 
   assert.equal(run.pasted, true)
   assert.deepEqual(calls(stub), [])
+})
+
+test("terminal window classes are refused the paste-over replace", () => {
+  assert.equal(terminalClass("Alacritty"), true)
+  assert.equal(terminalClass("org.wezfurlong.wezterm"), true)
+  assert.equal(terminalClass("kitty"), true)
+  assert.equal(terminalClass("com.gnome.Terminal"), true)
+  assert.equal(terminalClass("firefox"), false)
+  assert.equal(terminalClass("com.nousresearch.hermes"), false)
+  assert.equal(terminalClass(""), false)
+  assert.equal(terminalClass(undefined), false)
+  assert.equal(terminalClass(7), false)
 })

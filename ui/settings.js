@@ -19,7 +19,14 @@ var DESCRIPTORS = {
   // accessibility bus and check all of it. Apps that do not expose
   // accessibility take the old Ctrl + C path unchanged, so this reads as a
   // capability, not a mode switch.
-  wholeTextbox: { type: "boolean", fallback: true }
+  wholeTextbox: { type: "boolean", fallback: true },
+  // Web content (Chromium/Electron) offers the accessibility bus no write
+  // path at all. With this on, a whole-textbox run in such a field copies
+  // the correction, and once the compositor confirms the very same window
+  // holds the keyboard again, selects all and pastes over the field.
+  // Off by default: it sends keystrokes, and a terminal class is refused
+  // outright because a paste into a shell is a command.
+  pasteReplace: { type: "boolean", fallback: false }
 }
 
 var NATIVE_LANGUAGE_OPTIONS = [

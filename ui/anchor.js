@@ -162,6 +162,24 @@ function placeCard(options) {
   }
 }
 
+// A paste that selects all and overwrites is a command inside a terminal,
+// so the web-app paste-replace refuses these window classes outright.
+// Matched case-insensitively as substrings: classes arrive qualified
+// ("org.wezfurlong.wezterm", "kitty") or bare ("Alacritty").
+var TERMINAL_CLASS_MARKERS = [
+  "terminal", "terminator", "alacritty", "kitty", "foot",
+  "wezterm", "konsole", "xterm", "tilix", "ghostty", "contour"
+]
+
+function terminalClass(windowClass) {
+  if (typeof windowClass !== "string") return false
+  var lower = windowClass.toLowerCase()
+  for (var i = 0; i < TERMINAL_CLASS_MARKERS.length; i += 1) {
+    if (lower.indexOf(TERMINAL_CLASS_MARKERS[i]) !== -1) return true
+  }
+  return false
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     ADJACENT: ADJACENT,
@@ -176,6 +194,7 @@ if (typeof module !== "undefined" && module.exports) {
     activeWindowCommand: activeWindowCommand,
     focusCommand: focusCommand,
     isFocused: isFocused,
+    terminalClass: terminalClass,
     placeCard: placeCard
   }
 }

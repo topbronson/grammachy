@@ -14,6 +14,7 @@ ColumnLayout {
   property string engine: "harper"
   property bool autoReplace: false
   property bool wholeTextbox: false
+  property bool pasteReplace: false
   property string quickHotkey: "SUPER + SHIFT + Q"
   property string composeHotkey: "SUPER + ALT + Q"
   property string popupScreen: ""
@@ -184,6 +185,15 @@ ColumnLayout {
     checked: root.wholeTextbox
     foreground: Color.popups.text
     onClicked: root.settingChanged("wholeTextbox", !root.wholeTextbox)
+  }
+
+  Toggle {
+    Layout.fillWidth: true
+    label: "Replace in web apps"
+    description: "In browsers and Electron apps, which cannot be rewritten safely, select all and paste the correction back — only after the compositor confirms the same window is focused. Never inside a terminal."
+    checked: root.pasteReplace
+    foreground: Color.popups.text
+    onClicked: root.settingChanged("pasteReplace", !root.pasteReplace)
   }
 
   // The quick popup opens centred on the monitor picked here. The rows are

@@ -76,6 +76,10 @@ test("an unknown stored value reads as the default", () => {
   assert.equal(valueOf({ autoReplace: "yes" }, "autoReplace"), false)
   assert.equal(valueOf({ wholeTextbox: "yes" }, "wholeTextbox"), true)
   assert.equal(valueOf({ wholeTextbox: false }, "wholeTextbox"), false)
+  assert.equal(valueOf({ id: PLUGIN_ID }, "pasteReplace"), false)
+  assert.equal(valueOf({ pasteReplace: true }, "pasteReplace"), true)
+  assert.equal(valueOf({ pasteReplace: false }, "pasteReplace"), false)
+  assert.equal(valueOf({ pasteReplace: 1 }, "pasteReplace"), false)
 })
 
 test("a caller may pass its own fallback, which is the seam the overlay uses", () => {

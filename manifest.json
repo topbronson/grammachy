@@ -26,7 +26,8 @@
       "targetEnglish": "en-US",
       "engine": "harper",
       "autoReplace": false,
-      "wholeTextbox": true
+      "wholeTextbox": true,
+      "pasteReplace": false
     },
     "schema": [
       {
@@ -76,6 +77,12 @@
         "type": "boolean",
         "label": "Check whole textbox when nothing is selected",
         "defaultValue": true
+      },
+      {
+        "key": "pasteReplace",
+        "type": "boolean",
+        "label": "Replace in web apps by selecting all and pasting",
+        "defaultValue": false
       }
     ]
   }

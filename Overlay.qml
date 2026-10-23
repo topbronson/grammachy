@@ -1253,6 +1253,23 @@ Item {
       // place; without one — truncated, or the field already rewritten
       // under us — the honest fallback is the clipboard, which the
       // "Copied" label already tells the reader.
+      var target = root.wholeTarget
+      // Web content (Chromium/Electron) exposes no EditableText: the
+      // helper could never prove a write there. With "Replace in web
+      // apps" on, copy the correction, hand the keyboard back, and —
+      // only once the compositor confirms the very same window holds it
+      // again — select all and paste over the field. Terminals are
+      // refused outright: a paste into a shell is a command.
+      var webField = target !== null && target !== undefined
+        && target.editable_text === false
+      if (webField && !root.truncated && root.surface === "quick"
+          && root.setting("pasteReplace") === true
+          && !Anchor.terminalClass(root.sourceWindow
+            ? root.sourceWindow.class : "")) {
+        pasteKeystroke.selectAll = true
+        root.runCopy(true)
+        return
+      }
       if (root.wholeTarget !== null && !root.truncated) root.applyWholeTextbox()
       else root.runCopy(false)
       return
@@ -1935,9 +1952,16 @@ Item {
   Process {
     id: pasteKeystroke
     property int generation: 0
-    command: ["wtype", "-M", "ctrl", "v", "-m", "ctrl"]
+    property bool selectAll: false
+    // Whole-textbox runs replacing a field the toolkit will not write
+    // (web content: no EditableText) select all first so the paste lands
+    // over the whole field. Selection runs never set selectAll.
+    command: pasteKeystroke.selectAll
+      ? ["wtype", "-M", "ctrl", "a", "-m", "ctrl", "-M", "ctrl", "v", "-m", "ctrl"]
+      : ["wtype", "-M", "ctrl", "v", "-m", "ctrl"]
     onExited: {
       root.replacePending = false
+      pasteKeystroke.selectAll = false
       if (!root.isLive(pasteKeystroke.generation)) return
       root.releasePrimary()
     }
