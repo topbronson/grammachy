@@ -83,11 +83,23 @@ def _candidate(obj):
         role = obj.get_role_name()
         editable = obj.get_state_set().contains(Atspi.StateType.EDITABLE)
         pid = obj.get_process_id()
+        # Chromium exposes web text fields as read-only: they carry Text
+        # but no EditableText, so a write there can never be proven. The
+        # flag rides through probe/identity so the pure rules can refuse
+        # the write up front instead of attempting it. Interface names
+        # come back short ("EditableText") from gi but may arrive fully
+        # qualified from other bindings, so match the suffix.
+        try:
+            editable_text = any(str(n).endswith("EditableText")
+                                for n in obj.get_interfaces())
+        except Exception:
+            editable_text = True  # unknown: attempt and let readback decide
     except Exception:
         return None
     if role is None:
         return None
-    return {"obj": obj, "role": role, "editable": bool(editable), "pid": pid}
+    return {"obj": obj, "role": role, "editable": bool(editable),
+            "editable_text": bool(editable_text), "pid": pid}
 
 
 def _walk(root, visit, max_visits=MAX_VISITS):
@@ -282,6 +294,7 @@ def do_probe(pid=None):
         "window": window_name,
         "role": focused_cand["role"],
         "editable": True,
+        "editable_text": bool(focused_cand.get("editable_text", True)),
         "selection_empty": True,
         "all_text": all_text
     }))

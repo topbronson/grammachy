@@ -73,6 +73,12 @@ def matches_target(candidates, target):
         hits.append(candidate)
     if len(hits) == 0:
         return None, "target-gone"
+    # A field the toolkit refuses to write (Chromium web content carries
+    # no EditableText interface) can never produce a proven replacement;
+    # refuse before anything is attempted. Absent flag on either side is
+    # treated as unknown-and-permissive: the readback still has to pass.
+    if target.get("editable_text") is False:
+        return None, "write-unsupported"
     if len(hits) > 1:
         return None, "ambiguous-target"
     return hits[0], None

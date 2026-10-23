@@ -142,5 +142,42 @@ class TestProbeUsable(unittest.TestCase):
         self.assertFalse(probe_is_usable(None))
 
 
+class WriteUnsupportedGate(unittest.TestCase):
+    """A field whose toolkit offers no EditableText (Chromium web content)
+    must be refused before any write is attempted, while an absent flag
+    stays permissive so readback remains the arbiter."""
+
+    def _cand(self):
+        return {"role": "entry", "text": "I has two book.", "editable_text": True}
+
+    def _target(self, **over):
+        t = {"role": "entry", "all_text": "I has two book."}
+        t.update(over)
+        return t
+
+    def test_target_without_editable_text_is_refused(self):
+        hit, reason = matches_target([self._cand()],
+                                     self._target(editable_text=False))
+        self.assertIsNone(hit)
+        self.assertEqual(reason, "write-unsupported")
+
+    def test_target_with_editable_text_still_matches(self):
+        hit, reason = matches_target([self._cand()],
+                                     self._target(editable_text=True))
+        self.assertIsNotNone(hit)
+        self.assertIsNone(reason)
+
+    def test_absent_flag_is_permissive(self):
+        hit, reason = matches_target([self._cand()], self._target())
+        self.assertIsNotNone(hit)
+        self.assertIsNone(reason)
+
+    def test_refusal_beats_target_gone_ordering(self):
+        # the refusal only applies once a candidate actually matched;
+        # no match stays `target-gone` unchanged
+        _, reason = matches_target([], self._target(editable_text=False))
+        self.assertEqual(reason, "target-gone")
+
+
 if __name__ == "__main__":
     unittest.main()
