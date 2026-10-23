@@ -64,6 +64,9 @@ test("a missing key reads as the spec section 7 default", () => {
   assert.equal(valueOf({ id: PLUGIN_ID }, "nativeLanguage"), "none")
   assert.equal(valueOf({ id: PLUGIN_ID }, "engine"), "harper")
   assert.equal(valueOf({ id: PLUGIN_ID }, "autoReplace"), false)
+  // Whole-textbox checking ships on: the AT-SPI path is invisible when it
+  // does not answer, so the safe default is the capability being offered.
+  assert.equal(valueOf({ id: PLUGIN_ID }, "wholeTextbox"), true)
 })
 
 test("an unknown stored value reads as the default", () => {
@@ -71,6 +74,8 @@ test("an unknown stored value reads as the default", () => {
   assert.equal(valueOf({ engine: "claude" }, "engine"), "harper")
   assert.equal(valueOf({ engine: 7 }, "engine"), "harper")
   assert.equal(valueOf({ autoReplace: "yes" }, "autoReplace"), false)
+  assert.equal(valueOf({ wholeTextbox: "yes" }, "wholeTextbox"), true)
+  assert.equal(valueOf({ wholeTextbox: false }, "wholeTextbox"), false)
 })
 
 test("a caller may pass its own fallback, which is the seam the overlay uses", () => {

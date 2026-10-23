@@ -118,6 +118,16 @@ Item {
 
   property string borrowedClipboard: ""
   property bool clipboardBorrowed: false
+
+  // Whole-textbox mode (spec section 3): the summon found no selection and
+  // the AT-SPI helper read the focused field instead. `wholeTarget` is the
+  // helper's identity for that field — role, full text, pid — which the
+  // accept path hands back to replace the content without keystrokes.
+  // `lastCapturedWhole` lets a "check last text again" run keep the label
+  // honest; the identity itself does not survive to that run.
+  property bool wholeTextboxMode: false
+  property var wholeTarget: null
+  property bool lastCapturedWhole: false
   property bool pendingPrimaryPaste: false
   property int runGeneration: 0
 
@@ -348,6 +358,10 @@ Item {
     root.sourceWindow = null
     root.replacePending = false
     root.runCaptured = false
+    root.wholeTextboxMode = false
+    root.wholeTarget = null
+    atspiProbe.running = false
+    atspiWrite.running = false
     root.engineConfirm = ""
     root.phaseBeforeEngineConfirm = ""
     root.clearChunkRun()
@@ -564,6 +578,11 @@ Item {
     if (root.lastCapturedText.length === 0) return
     root.capturedText = root.lastCapturedText
     root.truncated = false
+    // The stored text came from a whole-textbox run: the label must stay
+    // "Replace textbox", but the old identity is stale by definition —
+    // there was no fresh probe — so replaces stays off and apply copies.
+    root.wholeTextboxMode = root.lastCapturedWhole
+    root.wholeTarget = null
     root.runCheck(root.lastCapturedText)
   }
 
@@ -596,10 +615,64 @@ Item {
   function onPrimaryCaptured(text, generation) {
     if (!root.isLive(generation)) return
     if (root.isSelection(text)) root.captured(text)
+    else if (root.setting("wholeTextbox")) {
+      // No primary selection: before borrowing the clipboard and sending
+      // Ctrl + C, ask the accessibility bus what the keyboard is pointed
+      // at. A supported field is read with no keystrokes at all; anything
+      // else falls through to the Ctrl + C path unchanged — Electron-family
+      // apps answer that one and not this.
+      var pid = Anchor.activeWindowPid(root.sourceWindow)
+      atspiProbe.command = ["/usr/bin/timeout", "6", "/usr/bin/python3",
+        root.pluginRoot + "/helpers/atspi_capture.py", "probe"]
+        .concat(pid.length > 0 ? [pid] : [])
+      atspiProbe.generation = generation
+      atspiProbe.running = true
+    }
     else {
       savedClipboard.generation = generation
       savedClipboard.running = true
     }
+  }
+
+  // The probe's own failures are invisible by design: an unsupported app
+  // takes the exact path it took before this feature, so the only visible
+  // outcomes are a checked textbox or the usual "nothing new" card.
+  function onAtspiProbed(text, generation) {
+    if (!root.isLive(generation)) return
+    var probe = null
+    try {
+      probe = JSON.parse(text)
+    } catch (error) {
+      probe = null
+    }
+    if (!probe || probe.supported !== true || probe.editable !== true
+        || probe.selection_empty !== true
+        || typeof probe.all_text !== "string"
+        || String(probe.all_text).replace(/^\s+|\s+$/g, "").length === 0) {
+      savedClipboard.generation = generation
+      savedClipboard.running = true
+      return
+    }
+    root.wholeTarget = probe
+    root.capturedWhole(String(probe.all_text))
+  }
+
+  // The whole-textbox sibling of captured(): same staleness memory, same
+  // check, but the run never touched the primary clipboard — so it never
+  // claims it. runCaptured stays false and releasePrimary stays quiet.
+  function capturedWhole(text) {
+    var address = Anchor.windowAddress(root.sourceWindow)
+    if (Capture.isStale(text, address, root.lastCapture())) {
+      root.showNothingNew()
+      return
+    }
+    root.capturedText = text
+    root.truncated = false
+    root.runCaptured = false
+    root.wholeTextboxMode = true
+    root.lastCapturedWhole = true
+    root.consumeCapture(text, address)
+    root.runCheck(text)
   }
 
   // Step 2 of spec section 3: no primary selection, so borrow the clipboard,
@@ -1174,7 +1247,50 @@ Item {
 
   function applyCorrected() {
     if (!root.canApply()) return
+    if (root.wholeTextboxMode) {
+      // The paste path pastes over a selection; a whole-textbox run has
+      // none. With a live identity the helper replaces the content in
+      // place; without one — truncated, or the field already rewritten
+      // under us — the honest fallback is the clipboard, which the
+      // "Copied" label already tells the reader.
+      if (root.wholeTarget !== null && !root.truncated) root.applyWholeTextbox()
+      else root.runCopy(false)
+      return
+    }
     root.runCopy(root.surface === "quick" && root.autoReplace && root.runCaptured)
+  }
+
+  function applyWholeTextbox() {
+    atspiWrite.identity = JSON.stringify(root.wholeTarget)
+    atspiWrite.stdinText = root.correctedText()
+    atspiWrite.command = ["/usr/bin/timeout", "6", "/usr/bin/python3",
+      root.pluginRoot + "/helpers/atspi_capture.py", "write", atspiWrite.identity]
+    atspiWrite.generation = root.runGeneration
+    atspiWrite.stdinEnabled = true
+    atspiWrite.running = true
+  }
+
+  function onAtspiWritten(text, code, generation) {
+    console.warn("grammachy atspi: write report code=" + code + " gen=" + generation +
+      "/" + root.runGeneration + " answerlen=" + text.length +
+      " head=" + JSON.stringify(text.slice(0, 48)))
+    if (!root.isLive(generation)) return
+    var answer = null
+    try {
+      answer = JSON.parse(text)
+    } catch (error) {
+      answer = null
+    }
+    if (code === 0 && answer && answer.written === true && answer.verified === true) {
+      root.applied = true
+      root.wholeTarget = null
+      root.close()
+      return
+    }
+    // The helper could not prove the write — the field changed under us,
+    // the app refused it, or the bus stalled. Nothing was replaced, so
+    // fall back to the clipboard; the button already reads "Copied".
+    root.runCopy(false)
   }
 
   function runCopy(pasteAfter) {
@@ -1383,6 +1499,84 @@ Item {
       if (!root.pendingPrimaryPaste) return
       root.beginPrimaryPaste()
     }
+  }
+
+  // Whole-textbox probe: reads the focused editable field through the
+  // accessibility bus (see helpers/atspi_capture.py). The `timeout` wrapper
+  // is the outer bound on a wedged app; failures answer through the same
+  // onAtspiProbed path as an empty result and fall back to Ctrl + C.
+  Process {
+    id: atspiProbe
+    property int generation: 0
+    command: ["true"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.onAtspiProbed(text, atspiProbe.generation)
+    }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: if (text.length > 0) console.warn("grammachy atspi:", text)
+    }
+  }
+
+  // Whole-textbox accept: hands the corrected full text and the probe's
+  // identity to the helper, which re-resolves the field and replaces its
+  // content through the bus. Success is whatever the helper read back,
+  // never what it attempted.
+  Process {
+    id: atspiWrite
+    property int generation: 0
+    property int startedGeneration: 0
+    property string stdinText: ""
+    property string identity: ""
+    property string answer: ""
+    property bool exited: false
+    property bool stdoutDone: false
+    property bool stderrDone: false
+    property bool reported: false
+    onStarted: {
+      atspiWrite.startedGeneration = atspiWrite.generation
+      atspiWrite.answer = ""
+      atspiWrite.exited = false
+      atspiWrite.stdoutDone = false
+      atspiWrite.stderrDone = false
+      atspiWrite.reported = false
+      write(atspiWrite.stdinText)
+      atspiWrite.stdinEnabled = false
+    }
+    // onExited alone races the stdout collector: the stream can finish
+    // after the process is gone, so the answer would still be "" when we
+    // parse it. Report only once the exit AND both streams have landed.
+    function maybeReport() {
+      if (atspiWrite.reported) return
+      if (!atspiWrite.exited || !atspiWrite.stdoutDone || !atspiWrite.stderrDone) return
+      atspiWrite.reported = true
+      root.onAtspiWritten(atspiWrite.answer, atspiWrite.exitCode, atspiWrite.startedGeneration)
+    }
+
+    command: ["/usr/bin/timeout", "6", "/usr/bin/python3",
+      root.pluginRoot + "/helpers/atspi_capture.py", "write", "{}"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        atspiWrite.answer = text
+        atspiWrite.stdoutDone = true
+        atspiWrite.maybeReport()
+      }
+    }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text.length > 0) console.warn("grammachy atspi:", text)
+        atspiWrite.stderrDone = true
+        atspiWrite.maybeReport()
+      }
+    }
+    onExited: {
+      atspiWrite.exited = true
+      atspiWrite.maybeReport()
+    }
+    onRunningChanged: if (!atspiWrite.running) atspiWrite.maybeReport()
   }
 
   Process {
@@ -1820,6 +2014,9 @@ Item {
         sourceText: root.selectionText
         fullText: root.capturedText
         truncated: root.truncated
+        wholeTextboxMode: root.wholeTextboxMode
+        wholeReplaces: root.wholeTextboxMode && root.wholeTarget !== null && !root.truncated
+        wholeTextbox: root.setting("wholeTextbox")
         lastCapturedText: root.lastCapturedText
         limitUnits: root.checkLimitUnits
         issues: root.issues

@@ -42,6 +42,7 @@ function readActiveWindow(stdout) {
     width: Number(value.size[0]),
     height: Number(value.size[1])
   }
+  if (isFiniteNumber(value.pid) && value.pid > 0) window.pid = value.pid
   if (!isFiniteNumber(window.x) || !isFiniteNumber(window.y)) return null
   if (!isFiniteNumber(window.width) || !isFiniteNumber(window.height)) return null
   if (window.width <= 0 || window.height <= 0) return null
@@ -51,6 +52,15 @@ function readActiveWindow(stdout) {
 function windowAddress(window) {
   if (!window || typeof window.address !== "string") return ""
   return ADDRESS.test(window.address) ? window.address : ""
+}
+
+// The whole-textbox helper resolves its target by process id rather than by
+// the bus's notion of active, so the parser keeps the compositor's answer
+// for the client pid when it has one. Optional: every consumer that only
+// anchors by address is unaffected.
+function activeWindowPid(window) {
+  if (!window || !isFiniteNumber(window.pid) || window.pid <= 0) return ""
+  return String(window.pid)
 }
 
 // The query both steps of the Apply use. `hyprctl` is what Omarchy ships to
@@ -162,6 +172,7 @@ if (typeof module !== "undefined" && module.exports) {
     SOURCE_GONE_META: SOURCE_GONE_META,
     readActiveWindow: readActiveWindow,
     windowAddress: windowAddress,
+    activeWindowPid: activeWindowPid,
     activeWindowCommand: activeWindowCommand,
     focusCommand: focusCommand,
     isFocused: isFocused,

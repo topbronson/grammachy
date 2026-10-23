@@ -13,6 +13,7 @@ ColumnLayout {
   property string targetEnglish: "en-US"
   property string engine: "harper"
   property bool autoReplace: false
+  property bool wholeTextbox: false
   property string quickHotkey: "SUPER + SHIFT + Q"
   property string composeHotkey: "SUPER + ALT + Q"
   property string popupScreen: ""
@@ -174,6 +175,15 @@ ColumnLayout {
     checked: root.autoReplace
     foreground: Color.popups.text
     onClicked: root.settingChanged("autoReplace", !root.autoReplace)
+  }
+
+  Toggle {
+    Layout.fillWidth: true
+    label: "Check whole textbox"
+    description: "With nothing highlighted, check all of the text you are typing in"
+    checked: root.wholeTextbox
+    foreground: Color.popups.text
+    onClicked: root.settingChanged("wholeTextbox", !root.wholeTextbox)
   }
 
   // The quick popup opens centred on the monitor picked here. The rows are

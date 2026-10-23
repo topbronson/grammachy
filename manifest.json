@@ -25,7 +25,8 @@
       "nativeLanguage": "none",
       "targetEnglish": "en-US",
       "engine": "harper",
-      "autoReplace": false
+      "autoReplace": false,
+      "wholeTextbox": true
     },
     "schema": [
       {
@@ -69,6 +70,12 @@
         "type": "boolean",
         "label": "Auto-replace the selection",
         "defaultValue": false
+      },
+      {
+        "key": "wholeTextbox",
+        "type": "boolean",
+        "label": "Check whole textbox when nothing is selected",
+        "defaultValue": true
       }
     ]
   }

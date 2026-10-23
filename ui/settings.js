@@ -14,7 +14,12 @@ var DESCRIPTORS = {
   // The monitor the quick popup opens centred on, chosen in Settings. The
   // `text` type rejects the blank, so the `Auto` write stores "" and reads
   // back the "" fallback — an unset pin and a cleared one are one state.
-  popupScreen: { type: "text", fallback: "" }
+  popupScreen: { type: "text", fallback: "" },
+  // When a summon finds no selection, read the focused textbox through the
+  // accessibility bus and check all of it. Apps that do not expose
+  // accessibility take the old Ctrl + C path unchanged, so this reads as a
+  // capability, not a mode switch.
+  wholeTextbox: { type: "boolean", fallback: true }
 }
 
 var NATIVE_LANGUAGE_OPTIONS = [

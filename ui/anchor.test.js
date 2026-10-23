@@ -13,6 +13,7 @@ const {
   SOURCE_GONE_BODY,
   readActiveWindow,
   windowAddress,
+  activeWindowPid,
   activeWindowCommand,
   focusCommand,
   isFocused,
@@ -178,6 +179,22 @@ test("an activewindow answer reads as the window that held the Selection", () =>
   }))
   assert.deepEqual(window, { address: "0x5646e7c0ee90", x: 12, y: 36, width: 1181, height: 1302 })
   assert.equal(windowAddress(window), "0x5646e7c0ee90")
+})
+
+test("a client pid rides along when the compositor names one", () => {
+  const window = readActiveWindow(JSON.stringify({
+    address: "0x5646e7c0ee90", at: [12, 36], size: [1181, 1302], pid: 4242
+  }))
+  assert.equal(window.pid, 4242)
+  assert.equal(activeWindowPid(window), "4242")
+  // The whole-textbox helper is addressed by pid; a window without one, or
+  // with a nonsense one, answers the empty string and the probe falls back.
+  assert.equal(activeWindowPid(readActiveWindow(JSON.stringify({
+    address: "0x5646e7c0ee90", at: [12, 36], size: [1181, 1302]
+  }))), "")
+  assert.equal(activeWindowPid({ address: "0x1a", pid: 0 }), "")
+  assert.equal(activeWindowPid({ address: "0x1a", pid: "four" }), "")
+  assert.equal(activeWindowPid(null), "")
 })
 
 // Hyprland answers `{}` on the desktop, and a missing `hyprctl` answers

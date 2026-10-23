@@ -764,3 +764,26 @@ To move the musl packages, change `MUSL_VERSION` in `release.yml` to a version t
 
 `cli.lock` carries the crate version and an empty `sha256` until a later commit pins the tag asset.
 The setup card reads that empty hash as no pinned release and shows the developer path instead of an Install button.
+
+## 20. Smoke item 7: a whole textbox through the accessibility bus
+
+1. Start a bus-exposed app with a text field, for example `zenity --entry --entry-text="I has two book."`, and click into the field so the caret sits in it. Nothing highlighted.
+2. Clear the primary selection: `wl-copy --primary --clear`.
+3. Summon with SUPER + SHIFT + Q.
+
+Expected: the popup opens on the whole text — the card shows `I has two book.` with the `has → have` suggestion — even though nothing was selected and the clipboard was empty.
+The journal shows the helper speaking: `journalctl --user -grep grammachy.atspi` lines `probe ok role=… chars=15`.
+No Ctrl + C went anywhere: the run never borrowed the clipboard, so your own clipboard is untouched and the field keeps its caret and its selection-free state.
+
+4. Press Enter to accept the suggestion, then click `Replace textbox`.
+
+Expected: the field itself reads `I have two books.` — ask the helper directly: `/usr/bin/python3 helpers/atspi_capture.py probe <pid>` answers it in `all_text`.
+The popup closed, and `journalctl` shows `write ok chars=17` plus the read-back, not just an attempt.
+
+5. Toggle `Check whole textbox` off in Settings and summon on the same field with nothing selected.
+
+Expected: the old path answers instead — no probe line in the journal, and the popup shows the nothing-new state (zenity copies to the clipboard only on a real selection).
+
+6. Summon over an app that is not on the bus (the Hermes desktop terminal, for example) with text typed but nothing highlighted.
+
+Expected: unchanged v1 behaviour — the Ctrl + C fallback runs, and with nothing to copy the nothing-new state shows. An app that does not answer the probe is not an error; it is an app that keeps the path it always had.

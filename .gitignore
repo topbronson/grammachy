@@ -3,3 +3,5 @@ node_modules/
 cli/target/
 bin/grammachy
 .claude/
+__pycache__/
+*.pyc

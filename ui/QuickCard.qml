@@ -26,6 +26,11 @@ BorderSurface {
   property string sourceText: ""
   property string fullText: ""
   property bool truncated: false
+  // Whole-textbox run: the label must say "Replace textbox", and `replaces`
+  // comes from the helper's live identity (`wholeReplaces`) rather than from
+  // a claimed primary selection.
+  property bool wholeTextboxMode: false
+  property bool wholeReplaces: false
   property string lastCapturedText: ""
   property int limitUnits: 5000
   property var issues: []
@@ -35,6 +40,9 @@ BorderSurface {
   property int elapsedMs: 0
   property bool applied: false
   property bool autoReplace: false
+  // The stored "check whole textbox" setting, passed down to SettingsView;
+  // distinct from wholeTextboxMode, which is per-run state.
+  property bool wholeTextbox: false
   property bool runCaptured: false
   property string noticeTitle: ""
   property string noticeBody: ""
@@ -101,7 +109,7 @@ BorderSurface {
   readonly property bool isEmptyResult: root.phase === "result" && root.issueCount === 0
   readonly property bool isNothingNew: root.phase === "empty"
   readonly property bool hasLastCapture: root.lastCapturedText.length > 0
-  readonly property bool replaces: root.autoReplace && root.runCaptured
+  readonly property bool replaces: root.autoReplace && (root.runCaptured || root.wholeReplaces)
   readonly property var focusedIssue: root.hasIssues && root.focusIndex >= 0 && root.focusIndex < root.issueCount
     ? root.issues[root.focusIndex] : null
 
@@ -138,7 +146,8 @@ BorderSurface {
   }
 
   function applyLabel() {
-    if (root.replaces) return root.applied ? "Replaced" : "Replace selection"
+    if (root.replaces) return root.applied ? "Replaced"
+      : (root.wholeTextboxMode ? "Replace textbox" : "Replace selection")
     return root.applied ? "Copied" : "Copy corrected text"
   }
 
@@ -203,6 +212,7 @@ BorderSurface {
       targetEnglish: root.targetEnglish
       engine: root.engineSetting
       autoReplace: root.autoReplace
+      wholeTextbox: root.wholeTextbox
       quickHotkey: root.quickHotkey
       composeHotkey: root.composeHotkey
       popupScreen: root.popupScreen
