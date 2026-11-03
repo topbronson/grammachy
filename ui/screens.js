@@ -17,7 +17,11 @@ function isFiniteNumber(value) {
 // name or no size is dropped rather than drawn wrong, so an output unplugged
 // between summons simply leaves the list.
 function layoutOf(screens, box) {
-  if (!Array.isArray(screens)) return []
+  // `Quickshell.screens` is a QQmlListProperty: list-like but NOT an Array,
+  // so `Array.isArray` is false for it — guarding that way silently drops
+  // every live monitor and the picker renders nothing. Accept anything with
+  // a numeric length (QQmlListProperty and real Arrays alike).
+  if (!screens || typeof screens.length !== "number") return []
 
   var usable = []
   for (var i = 0; i < screens.length; i++) {

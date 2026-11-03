@@ -9,8 +9,19 @@ const ABOVE = { name: "HDMI-A-5", x: 2560, y: -720, width: 1920, height: 1080 }
 
 test("nothing usable draws nothing", () => {
   assert.deepEqual(layoutOf(undefined, { width: 300, height: 120 }), [])
+  assert.deepEqual(layoutOf(null, { width: 300, height: 120 }), [])
+  assert.deepEqual(layoutOf({}, { width: 300, height: 120 }), [])
   assert.deepEqual(layoutOf([], { width: 300, height: 120 }), [])
   assert.deepEqual(layoutOf([null, {}, { name: "X", x: 0, y: 0 }], { width: 300, height: 120 }), [])
+})
+
+test("a QQmlListProperty-shaped list lays out like an Array", () => {
+  // `Quickshell.screens` reaches the helper list-like but not an Array; the
+  // picker rendered nothing while the guard was `Array.isArray`.
+  const likeList = { length: 2, 0: LEFT, 1: WIDE }
+  const rows = layoutOf(likeList, { width: 300, height: 120 })
+  assert.equal(rows.length, 2)
+  assert.deepEqual(rows.map(function (row) { return row.name }), ["DP-4", "DP-6"])
 })
 
 test("one screen fills the box it is fitted into", () => {
