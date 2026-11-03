@@ -227,7 +227,9 @@ fn apply_replaces_only_on_a_run_that_holds_a_selection() {
 
     let card = read("ui/QuickCard.qml");
     assert!(
-        card.contains("readonly property bool replaces: root.autoReplace && root.runCaptured"),
+        card.contains(
+            "readonly property bool replaces: root.autoReplace && (root.runCaptured || root.wholeReplaces)"
+        ),
         "one property of the card says whether Apply replaces"
     );
     let label = function_body(&card, "applyLabel");

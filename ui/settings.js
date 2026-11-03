@@ -15,10 +15,11 @@ var DESCRIPTORS = {
   // `text` type rejects the blank, so the `Auto` write stores "" and reads
   // back the "" fallback — an unset pin and a cleared one are one state.
   popupScreen: { type: "text", fallback: "" },
-  // When a summon finds no selection, read the focused textbox through the
-  // accessibility bus and check all of it. Apps that do not expose
-  // accessibility take the old Ctrl + C path unchanged, so this reads as a
-  // capability, not a mode switch.
+  // When a summon finds no selection, highlight the whole field the caret
+  // sits in (Ctrl + A into the edit box, gated by the accessibility probe
+  // and refused at terminals) and check the resulting selection. Apps that
+  // publish no keyboard selection take the old Ctrl + C path unchanged, so
+  // this reads as a capability, not a mode switch.
   wholeTextbox: { type: "boolean", fallback: true },
   // Web content (Chromium/Electron) offers the accessibility bus no write
   // path at all. With this on, a whole-textbox run in such a field copies

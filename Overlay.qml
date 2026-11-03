@@ -102,6 +102,18 @@ Item {
   property bool replacePending: false
   property bool runCaptured: false
 
+  // Set when a summon with nothing highlighted reached its text by
+  // highlighting the whole field first (Ctrl + A into the edit box, then
+  // reading the Selection). Replace on such a run re-highlights and pastes
+  // rather than writing through the accessibility bus.
+  property bool wholeRun: false
+
+  // The full text the edit-context probe read on this run, kept as the
+  // recovery answer when the copy after the highlight proves nothing
+  // (the freshness rule cannot tell a silent Ctrl + C from a same-text
+  // clipboard, and the probe already holds the field's whole text).
+  property string probeAllText: ""
+
   property var engines: []
   property string engineBusy: ""
   property double engineBusyBytes: 0
@@ -336,6 +348,10 @@ Item {
     savedClipboard.running = false
     copyKeystroke.running = false
     fallbackPaste.running = false
+    selectAllKeystroke.running = false
+    selectAllSettle.stop()
+    root.wholeRun = false
+    root.probeAllText = ""
     checkProcess.restartQueued = false
     checkProcess.running = false
     chunkProcess.restartQueued = false
@@ -616,12 +632,20 @@ Item {
     if (!root.isLive(generation)) return
     if (root.isSelection(text)) root.captured(text)
     else if (root.setting("wholeTextbox")) {
-      // No primary selection: before borrowing the clipboard and sending
-      // Ctrl + C, ask the accessibility bus what the keyboard is pointed
-      // at. A supported field is read with no keystrokes at all; anything
-      // else falls through to the Ctrl + C path unchanged — Electron-family
-      // apps answer that one and not this.
+      // No primary selection: highlight everything in the field the caret
+      // sits in, then capture the resulting Selection. The accessibility
+      // probe is no longer the reader — it is the gate that says a plain
+      // edit box has the keyboard, so Ctrl + A cannot land as an app
+      // command. A terminal is refused outright, and every unsupported
+      // or empty answer falls through to the unchanged Ctrl + C
+      // clipboard path, so the worst case costs one card.
       var pid = Anchor.activeWindowPid(root.sourceWindow)
+      if (Anchor.terminalClass(root.sourceWindow
+          ? root.sourceWindow.class : "")) {
+        savedClipboard.generation = generation
+        savedClipboard.running = true
+        return
+      }
       atspiProbe.command = ["/usr/bin/timeout", "6", "/usr/bin/python3",
         root.pluginRoot + "/helpers/atspi_capture.py", "probe"]
         .concat(pid.length > 0 ? [pid] : [])
@@ -632,6 +656,28 @@ Item {
       savedClipboard.generation = generation
       savedClipboard.running = true
     }
+  }
+
+  function onSelectAllSent(generation) {
+    if (!root.isLive(generation)) return
+    // The highlight is visual proof the whole field is selected; some
+    // toolkits (GTK3 among them) do not publish primary for a keyboard
+    // highlight, so the text is still taken the proven way — Ctrl + C into
+    // a borrowed clipboard. The baseline goes first so the freshness rule
+    // still compares against a known clipboard.
+    selectAllSettle.generation = generation
+    selectAllSettle.restart()
+  }
+
+  // The run that a select-all produced is a whole-textbox run wearing a
+  // Selection's clothes: the text came in as an ordinary Selection, so
+  // Replace runs the proven select-all + paste path instead of the
+  // accessibility write that several toolkits answer unreliably.
+  function capturedSelectAll(text) {
+    root.wholeTextboxMode = true
+    root.wholeTarget = null
+    root.wholeRun = true
+    root.captured(text)
   }
 
   // The probe's own failures are invisible by design: an unsupported app
@@ -653,8 +699,14 @@ Item {
       savedClipboard.running = true
       return
     }
-    root.wholeTarget = probe
-    root.capturedWhole(String(probe.all_text))
+    // The probe proved a plain editable field holds the keyboard and holds
+    // text: highlight all of it, then take the copy the proven way. The
+    // probe's own text is kept as the recovery answer in case the copy
+    // afterwards proves nothing.
+    root.wholeTarget = null
+    root.probeAllText = String(probe.all_text)
+    selectAllKeystroke.generation = generation
+    selectAllKeystroke.running = true
   }
 
   // The whole-textbox sibling of captured(): same staleness memory, same
@@ -705,6 +757,15 @@ Item {
     // leaving the clipboard as it was, so what came back is an earlier copy
     // rather than a Selection.
     if (Capture.copiedNothing(borrowed, text)) {
+      // A highlight the toolkit never published (GTK3 keyboard selections
+      // set no primary) answers Ctrl + C as "nothing selected", leaving the
+      // clipboard untouched. The edit-context probe already read the whole
+      // field seconds ago and proved it held text, so that text is the
+      // honest answer rather than an empty card.
+      if (root.probeAllText.length > 0) {
+        root.capturedSelectAll(root.probeAllText)
+        return
+      }
       root.showNothingNew()
       return
     }
@@ -1271,6 +1332,18 @@ Item {
         return
       }
       if (root.wholeTarget !== null && !root.truncated) root.applyWholeTextbox()
+      else if (root.wholeRun && !root.truncated && root.surface === "quick"
+          && root.setting("pasteReplace") === true
+          && !Anchor.terminalClass(root.sourceWindow
+            ? root.sourceWindow.class : "")) {
+        // Captured by highlighting the whole field: replace it the same
+        // way — re-highlight after the verified refocus, then paste over
+        // it. The re-highlight is deliberate; a selection made before the
+        // popup took the keyboard may not have survived.
+        pasteKeystroke.selectAll = true
+        root.runCopy(true)
+        return
+      }
       else root.runCopy(false)
       return
     }
@@ -1455,6 +1528,32 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.onPrimaryCaptured(text, primaryPaste.startedGeneration)
+    }
+  }
+
+  // Step 2 of the no-selection path, spec section 3: highlight everything
+  // in the edit box the caret sits in. Only ever sent after the probe said
+  // a plain editable field holds the keyboard and the window is no
+  // terminal, so the keystroke is select-all and never an app command.
+  Process {
+    id: selectAllKeystroke
+    property int generation: 0
+    property int startedGeneration: 0
+    command: Capture.selectAllCommand()
+    onStarted: selectAllKeystroke.startedGeneration = root.runGeneration
+    onExited: root.onSelectAllSent(selectAllKeystroke.startedGeneration)
+  }
+
+  // The selection needs a moment to exist before the copy is sent into it.
+  Timer {
+    id: selectAllSettle
+    property int generation: 0
+    interval: 150
+    repeat: false
+    onTriggered: {
+      if (!root.isLive(selectAllSettle.generation)) return
+      savedClipboard.generation = selectAllSettle.generation
+      savedClipboard.running = true
     }
   }
 

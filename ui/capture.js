@@ -69,6 +69,31 @@ function primaryCommand() {
   return pasteCommand(true, PASTE_LIMIT_BYTES)
 }
 
+// The keystroke that highlights everything in the field the keyboard is
+// pointed at. A summon with nothing highlighted sends this into the source
+// window first and then reads the primary selection: the run is captured as
+// an ordinary Selection, so Replace keeps the select-all + paste path rather
+// than the accessibility write, which several toolkits answer unreliably.
+// The send is gated by the caller — never at a terminal, and never blind
+// where a Ctrl + A is an app command — and the read is plain `primaryCommand`
+// because keyboard selection does not reliably publish primary.
+function selectAllCommand() {
+  return ["wtype", "-M", "ctrl", "a", "-m", "ctrl"]
+}
+
+// Whether one summon should send the select-all keystroke. It goes only to
+// a plain edit context (a caret in a textbox) — never to a terminal, where
+// Ctrl + A is an app command — and never when a Selection already exists or
+// the setting is off. The caller has already ruled out a search/page context
+// by the time it asks; a wrong answer costs one "nothing new" card, because
+// the empty read falls through to the unchanged Ctrl + C clipboard path.
+function shouldSelectAll(wholeTextboxOn, hasSelection, isTerminal, context) {
+  if (wholeTextboxOn !== true) return false
+  if (hasSelection === true) return false
+  if (isTerminal === true) return false
+  return context === "edit"
+}
+
 function fallbackCommand() {
   return pasteCommand(false, PASTE_LIMIT_BYTES)
 }
@@ -112,6 +137,8 @@ if (typeof module !== "undefined" && module.exports) {
     copiedNothing: copiedNothing,
     pasteCommand: pasteCommand,
     primaryCommand: primaryCommand,
+    selectAllCommand: selectAllCommand,
+    shouldSelectAll: shouldSelectAll,
     fallbackCommand: fallbackCommand,
     borrowCommand: borrowCommand,
     utf8Bytes: utf8Bytes,

@@ -598,3 +598,21 @@ test("a borrowed clipboard at its bound is not borrowed", () => {
   assert.equal(Capture.pasteOverflowed(""), false)
   assert.equal(Capture.pasteOverflowed(undefined), false)
 })
+
+test("the highlight keystroke is a plain Ctrl + A press and release", () => {
+  assert.deepEqual(Capture.selectAllCommand(), ["wtype", "-M", "ctrl", "a", "-m", "ctrl"])
+})
+
+test("the highlight goes only to a plain edit context", () => {
+  assert.equal(Capture.shouldSelectAll(true, false, false, "edit"), true)
+  // Off means off.
+  assert.equal(Capture.shouldSelectAll(false, false, false, "edit"), false)
+  assert.equal(Capture.shouldSelectAll(undefined, false, false, "edit"), false)
+  // A Selection needs no highlighting; a terminal and any non-edit context
+  // never see the keystroke, because Ctrl + A is an app command there.
+  assert.equal(Capture.shouldSelectAll(true, true, false, "edit"), false)
+  assert.equal(Capture.shouldSelectAll(true, false, true, "edit"), false)
+  assert.equal(Capture.shouldSelectAll(true, false, false, "search"), false)
+  assert.equal(Capture.shouldSelectAll(true, false, false, ""), false)
+  assert.equal(Capture.shouldSelectAll(true, false, false, undefined), false)
+})
