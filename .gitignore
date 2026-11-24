@@ -5,3 +5,4 @@ bin/grammachy
 .claude/
 __pycache__/
 *.pyc
+verification/.cache/
